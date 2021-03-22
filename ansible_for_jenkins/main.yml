@@ -1,0 +1,173 @@
+---
+- hosts: jenkins-master
+  become: true
+  vars:
+    user : user_name
+    admin_user_pass: user_password
+
+    jenkins_plugins:
+      - cloudbees-folder
+      - antisamy-markup-formatter
+      - build-timeout
+      - credentials-binding
+      - build-timestamp
+      - ws-cleanup
+      - ant-in-workspace
+      - gradle-repo
+      - pipeline
+      - pipeline-github-lib
+      - pipeline-stage-view
+      - github
+      - git
+      - github-api
+      - github-branch-source
+      - ssh-slaves
+      - matrix-auth
+      - pam-auth
+      - ldapemail
+      - email-ext
+      - greenballs
+      - workflow-aggregator
+      - docker-plugin
+      - docker-workflow
+      - docker-build-step
+      - ssh-agent
+
+  tasks:
+    - name: VM | install python3-pip
+      apt:
+        name: python3-pip
+        state: present
+        update_cache: yes
+
+    - name: VM | іnstall git
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+
+    - name: VM | install openjdk-8-jdk
+      apt:
+        name: openjdk-8-jdk
+        state: present
+      become: yes
+
+    - name: VM | install openjdk-8-jre
+      apt:
+        name: openjdk-8-jre
+        state: present
+      become: yes
+
+    - name: Jenkins | ensure the jenkins apt repository key is installed
+      apt_key: url=https://pkg.jenkins.io/debian-stable/jenkins.io.key state=present
+      become: yes
+
+    - name: Jenkins | ensure the repository is configured
+      apt_repository: repo='deb https://pkg.jenkins.io/debian-stable binary/' state=present
+      become: yes
+
+    - name: Jenkins | ensure jenkins is installed
+      apt: name=jenkins update_cache=yes
+      become: yes
+
+    - name: Jenkins | ensure jenkins is running
+      service: name=jenkins state=started
+
+    - name: Jenkins | sleep for 30 seconds and continue with play
+      wait_for: timeout=30
+
+    - name: Jenkins | read admin pwd
+      shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: adminpwd
+      become: yes
+
+    - name: Jenkins | print password
+      ansible.builtin.debug:
+        msg:
+          - "{{ adminpwd.stdout }}"
+
+    - name: Jenkins | unlock and add admin user
+      jenkins_script:
+        script: |
+          import jenkins.model.*
+          import hudson.security.*
+          def instance = Jenkins.getInstance()
+          def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+          hudsonRealm.createAccount('${user_name}', '${user_pwd}')
+          instance.setSecurityRealm(hudsonRealm)
+          def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+          strategy.setAllowAnonymousRead(false)
+          instance.setAuthorizationStrategy(strategy)
+          instance.save()
+        args:
+          user_pwd: "{{ admin_user_pass }}"
+          user_name: "{{ user }}"
+        user: admin
+        password: "{{ adminpwd.stdout }}"
+
+    - name: Jenkins | complete setup wizard
+      jenkins_script:
+        script: |
+          import static jenkins.model.Jenkins.instance as jenkins
+          import jenkins.install.InstallState
+          if (!jenkins.installState.isSetupComplete()) {
+            InstallState.INITIAL_SETUP_COMPLETED.initializeState()
+          }
+        user: admin
+        password: "{{ adminpwd.stdout }}"
+
+    - name: Jenkins | install plugin
+      jenkins_plugin:
+        name: "{{ item }}"
+        state: latest
+        url_username: admin
+        url_password: "{{ adminpwd.stdout }}"
+      with_items: "{{ jenkins_plugins }}"
+      become: yes
+
+    - name: VM | install python jenkins
+      shell: pip3 install python-jenkins
+
+
+    - name: Docker | install aptitude using apt
+      apt: name=aptitude state=latest update_cache=yes force_apt_get=yes
+
+    - name: Docker | install required system packages
+      apt: name={{ item }} state=latest update_cache=yes
+      loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools']
+
+    - name: Docker | add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Docker | add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu bionic stable
+        state: present
+
+    - name: Docker | update apt and install docker-ce
+      apt: update_cache=yes name=docker-ce state=latest
+
+    - name: Docker | install Docker Module for Python
+      pip:
+        name: docker
+
+    - name: Docker | create group docker
+      shell: groupadd docker; usermod -aG docker $USER; usermod -a -G docker jenkins; chmod 777 /var/run/docker.sock ;
+
+    - name: SSH | create empty file
+      file:
+        path: "/home/{{ user }}/.ssh/id_rsa_slave"
+        state: touch
+
+    - name: SSH | put pubkey
+      lineinfile:
+        path: "/home/{{ user }}/.ssh/id_rsa_slave"
+        line: "{{ key }}"
+
+    - name: Jenkins | ensure jenkins is running
+      service: name=jenkins state=started
+
+    - name: Jenkins | jenkins restarted
+      service: name=jenkins state=restarted

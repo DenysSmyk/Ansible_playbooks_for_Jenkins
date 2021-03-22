@@ -1,0 +1,81 @@
+---
+- hosts: jenkins-slave
+  become: true
+  vars:
+    user : user_name
+
+  tasks:
+    - name: VM | install python3-pip
+      apt:
+        name: python3-pip
+        state: present
+        update_cache: yes
+
+    - name: VM | іnstall git
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+
+    - name: VM | install openjdk-8-jdk
+      apt:
+        name: openjdk-8-jdk
+        state: present
+      become: yes
+
+    - name: VM | install openjdk-8-jre
+      apt:
+        name: openjdk-8-jre
+        state: present
+      become: yes
+
+    - name: Docker | install aptitude using apt
+      apt: name=aptitude state=latest update_cache=yes force_apt_get=yes
+
+    - name: Docker | install required system packages
+      apt: name={{ item }} state=latest update_cache=yes
+      loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools']
+
+    - name: Docker | add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Docker | add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu bionic stable
+        state: present
+
+    - name: Docker | update apt and install docker-ce
+      apt: update_cache=yes name=docker-ce state=latest
+
+    - name: Docker | install Docker Module for Python
+      pip:
+        name: docker
+
+    - name: Docker | create group docker
+      shell: groupadd docker; usermod -aG docker $USER; usermod -a -G docker jenkins; chmod 777 /var/run/docker.sock ;
+
+    - name: Jenkins | create directory for jenkins slave
+      file:
+        path: "/home/{{ user }}/jenkins"
+        state: directory
+
+    - name: VM | change owner for directory
+      shell: chown -R {{ user }}:{{ user }} jenkins
+
+    - name: SSH | make directory for ssh
+      file:
+        path: "/home/{{ user }}/.ssh"
+        state: directory
+
+    - name: SSH | create empty file
+      file:
+        path: "/home/{{ user }}/.ssh/authorized_keys"
+        state: touch
+
+    - name: SSH | add pubkey to authorized_keys
+      ansible.builtin.lineinfile:
+        path: "/home/{{ user }}/.ssh/authorized_keys"
+        line: "{{ pubkey }}"
+        create: yes

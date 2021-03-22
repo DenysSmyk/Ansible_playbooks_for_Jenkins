@@ -1,0 +1,43 @@
+---
+- hosts: jenkins-slave
+  vars:
+    user: 'user_name'
+
+  tasks:
+    - name: Make direcotry for key
+      file:
+        path: "/home/{{ user }}/.ssh"
+        state: directory
+
+    - name: Create empty file
+      file:
+        path: "/home/{{ user }}/.ssh/authorized_keys"
+        state: touch
+
+    - name: Put pubkey
+      lineinfile:
+        path: "/home/{{ user }}/.ssh/authorized_keys"
+        line: "{{ pubkey }}"
+
+
+    - name: Configure sshd
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regex: "^(#)?{{item.key}}"
+        line: "{{item.key}} {{item.value}}"
+        state: present
+      loop:
+        - { key: "PermitRootLogin", value: "no" }
+        - { key: "PasswordAuthentication", value: "no" }
+        - { key: "UsePAM", value: "no" }
+      become: yes
+
+    - name: Restart sshd
+      service:
+        name: 'sshd'
+        state: restarted
+      become: yes
+
+
+
+

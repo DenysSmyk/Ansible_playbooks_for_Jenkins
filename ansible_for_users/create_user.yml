@@ -1,0 +1,39 @@
+---
+- hosts: jenkins-node
+  become: yes
+  vars:
+    user: 'user_name'
+
+  tasks:
+  - name: Create users with home directory
+    user:
+      name: '{{ user }}'
+      shell: /bin/bash
+      create_home: yes
+      password: "{{ upassword | password_hash('sha512') }}"
+
+  - name: Add user to sudo and docker groups
+    ansible.builtin.user:
+      name: '{{ user }}'
+      shell: /bin/bash
+      groups:
+        - sudo
+      append: yes
+
+  - name: Make direcotry for key
+    file:
+      path: "/home/{{ user }}/.ssh"
+      state: directory
+  - name: Create empty file
+    file:
+      path: "/home/{{ user }}/.ssh/authorized_keys"
+      state: touch
+
+  - name: Put pubkey
+    lineinfile:
+      path: "/home/{{ user }}/.ssh/authorized_keys"
+      line: "{{ pubkey }}"
+
+
+
+
