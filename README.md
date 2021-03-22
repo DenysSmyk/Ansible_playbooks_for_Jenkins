@@ -7,7 +7,9 @@
 POST payload to the Jenkins URL.
 
 3-4. Jenkins master starts job on Jenkins node.
-###Step 1 - Set up VM
+
+
+### Step 1 - Set up VM
 First, update your existing list of packages;
 ```
 $ sudo apt update
@@ -18,7 +20,7 @@ $ sudo apt install ansible
 ```
 Then put correct IP addresses in files `inventory.txt`;
 
-###Step 2 - Create users with SSH key
+### Step 2 - Create users with SSH key
 
 For create user you need to change variables and run `init_user_admin.yml` in `/ansible_for_users` directory;
 
@@ -34,7 +36,7 @@ For create user you need to change variables and run `create_user.yml` in `/ansi
 $ ansible-playbook create_user.yml -i inventory.txt -u [ADMIN_USER_NAME] --key-file=[PATH_TO_ADMIN_SSH_KEY] --extra-vars "ansible_sudo_pass=[ADMIN_USER_PASSWORD]" --extra-vars='upassword="[USER_PASSWORD]"' --extra-vars='pubkey="[USER_PUBLIC_KEY]"'
 ```
 
-###Step 3 - Configuration VMs and installation Jenkins;
+### Step 3 - Configuration VMs and installation Jenkins;
 
 For install dependencies and setting Jenkins you need to change variables and run `main.yml` in `ansible_for_jenkins` directory;
 ```
@@ -46,7 +48,7 @@ For install dependencies and setting Jenkins Node you need to change variables a
 $ ansible-playbook -i inventory.txt main.yml --key-file=[path_to_user_ssh_key] -u [USER_NAME] --ask-pass --extra-vars "ansible_sudo_pass=[USER_PASSWORD]" -c paramiko
 ```
 
-###Step 4 - Generate and update SSL certificates
+### Step 4 - Generate and update SSL certificates
 
 First you have to replace `HTTP_PORT` on `443` in `/etc/default/jenkins`;
 ```
@@ -62,9 +64,9 @@ Note: Google Chrome does not work well with self-signed certificates, to solve t
 * [Change settings Google Crome](https://www.pico.net/kb/how-do-you-get-chrome-to-accept-a-self-signed-certificate)
 * Install Mozilla Firefox
 
-###Step 5 - Settings GitHub Webhooks for Jenkins pipelines;
+### Step 5 - Settings GitHub Webhooks for Jenkins pipelines;
 
 [Documentation for configuration](https://www.blazemeter.com/blog/how-to-integrate-your-github-repository-to-your-jenkins-project)
 
-###Step 6 - Settings Backup for Jenkins jobs;
+### Step 6 - Settings Backup for Jenkins jobs;
 [Documentation for configuration](https://devopscube.com/jenkins-backup-data-configurations/)
